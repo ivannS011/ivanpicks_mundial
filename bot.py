@@ -98,7 +98,8 @@ def find_best_line(values, lines, label):
             if prob >= MIN_PROB and prob > best_prob:
                 best_prob, best = prob, {"bet": bet, "prob": prob}
     return best
-  def apif(endpoint, params):
+    
+def apif(endpoint, params):
     if load_req() >= MAX_API_REQ:
         return []
     key = f"{endpoint}|{sorted(params.items())}"
