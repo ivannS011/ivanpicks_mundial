@@ -470,12 +470,22 @@ def send_picks(odds_picks, stats_picks, title="Picks del dia"):
     save_sent(sent)
 
 def daily_analysis():
+    now = datetime.now(TZ)
+    mundial_start = datetime(2026, 6, 11, 0, 0, 0, tzinfo=TZ)
+    if now < mundial_start:
+        print("[CRON 03:00] Mundial no iniciado, esperando al 11 de junio...")
+        return
     print("\n[CRON 03:00] Analisis diario Mundial...")
     api_cache.clear()
     o, s = get_todays_picks()
     send_picks(o, s, "Picks del dia")
 
 def check_new_opportunities():
+    now = datetime.now(TZ)
+    mundial_start = datetime(2026, 6, 11, 0, 0, 0, tzinfo=TZ)
+    if now < mundial_start:
+        print("[CRON] Mundial no iniciado, esperando al 11 de junio...")
+        return
     if not is_useful_hour() or load_req() >= MAX_API_REQ:
         return
     print("[CRON 13:00] Revisando Mundial...")
@@ -494,7 +504,7 @@ if __name__ == "__main__":
     send_telegram("Bot IvanPicks Mundial iniciado - Copa Mundial FIFA 2026")
     daily_analysis()
     schedule.every().day.at("03:00").do(daily_analysis)
-    schedule.every().day.at("13:00").do(check_new_opportunities)
+    schedule.every(2).hours.do(check_new_opportunities)
     while True:
         schedule.run_pending()
         time.sleep(60)
