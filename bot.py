@@ -32,6 +32,7 @@ APIF_REQ_FILE  = "/tmp/apif_requests_mundial.json"
 ODDS_REQ_FILE  = "/tmp/odds_requests_mundial.json"
 SENT_FILE      = "/tmp/sent_picks_mundial.json"
 CACHE_FILE     = "/tmp/api_cache_mundial.json"
+REFEREE_FILE   = "/tmp/referee_history_mundial.json"
 CACHE_TTL      = 3600
 # ─── Contadores API-Football ──────────────────────────────────────────────────
 def load_apif_req():
@@ -130,7 +131,44 @@ def save_sent(picks_set):
             json.dump({"date": today, "picks": list(picks_set)}, f)
     except:
         pass
+def load_referee_history():
+    try:
+        with open(REFEREE_FILE) as f:
+            return json.load(f)
+    except:
+        return {}
 
+def save_referee_history(data):
+    try:
+        with open(REFEREE_FILE, "w") as f:
+            json.dump(data, f)
+    except:
+        pass
+def update_referee(name, yellows, reds):
+    if not name:
+        return
+    data = load_referee_history()
+    if name not in data:
+        data[name] = {"matches": [], "total_yellows": 0, "total_reds": 0, "count": 0}
+    data[name]["matches"].append({"yellows": yellows, "reds": reds})
+    data[name]["total_yellows"] += yellows
+    data[name]["total_reds"] += reds
+    data[name]["count"] += 1
+    save_referee_history(data)
+
+def get_referee_stats(name):
+    if not name:
+        return None
+    data = load_referee_history()
+    if name not in data or data[name]["count"] < 3:
+        return None
+    d = data[name]
+    return {
+        "name":         name,
+        "avg_yellows":  round(d["total_yellows"] / d["count"], 1),
+        "avg_reds":     round(d["total_reds"] / d["count"], 1),
+        "matches":      d["count"],
+    }
 # ─── Telegram con reintentos ──────────────────────────────────────────────────
 def send_telegram(msg, retries=3, delay=3):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
@@ -495,10 +533,21 @@ def get_picks_by_window(hour_from, hour_to, turno_label):
                 continue
             hora_str = ct_local.strftime("%H:%M")
             print(f"[{turno_label}] {hora_str} - {home} vs {away}")
+            hid = team_id_fuzzy(home)
+            aid = team_id_fuzzy(away)
+            referee_name = None
+            ref_stats = None
+            if hid and aid:
+                fx_data = apif("fixtures", {"team": hid, "next": 1})
+                if fx_data:
+                    referee_raw = fx_data[0].get("fixture", {}).get("referee") or ""
+                    referee_name = referee_raw.split(",")[0].strip() if referee_raw else None
+                    ref_stats = get_referee_stats(referee_name)
+
             stats = analyze_goals(home, away)
             pick  = best_odds_pick(home, away, bm, stats)
             if pick:
-                odds_picks.append({"match": f"{home} vs {away}", "hora": hora_str, **pick})
+                odds_picks.append({"match": f"{home} vs {away}", "hora": hora_str, "referee": ref_stats, **pick})
             if stats:
                 for goal_list, label in [
                     (stats.get("home_goals"), home),
@@ -516,6 +565,14 @@ def get_picks_by_window(hour_from, hour_to, turno_label):
                                 "sample": stats["sample"],
                             })
             cc = analyze_cc(home, away)
+            if ref_stats and cc.get("cards_avg") is not None:
+                ref_factor = ref_stats["avg_yellows"] / 3.5
+                cc["cards_avg"] = round((cc["cards_avg"] + ref_stats["avg_yellows"]) / 2, 1)
+                if cc.get("cards_total") and cc["cards_total"].get("prob"):
+                    adj = min(10, int((ref_factor - 1) * 15))
+                    cc["cards_total"]["prob"] = min(95, cc["cards_total"]["prob"] + adj)
+                    cc["cards_total"]["bet"] = cc["cards_total"]["bet"] + f" (Árbitro: {ref_stats['name']} {ref_stats['avg_yellows']}AM/p)"
+
             for field in ["corners_total", "corners_home", "corners_away",
                           "cards_total",   "cards_home",   "cards_away"]:
                 p = cc.get(field)
@@ -563,11 +620,10 @@ def send_picks(odds_picks, stats_picks, title):
     if new_o:
         msg += f"Casa: {casa}\n\n"
         for i, p in enumerate(new_o, 1):
-            msg += (f"Pick {i} | {p.get('hora', '')}\n"
-                    f"{p['match']}\n"
-                    f"Copa Mundial FIFA 2026\n"
-                    f"{p['bet']}\n"
-                    f"Cuota: {p['odd']} | Prob: {p['prob']}% | Valor: +{p['value']}%\n\n")
+            msg += f"Pick {i} | {p.get('hora', '')}\n{p['match']}\nCopa Mundial FIFA 2026\n{p['bet']}\nCuota: {p['odd']} | Prob: {p['prob']}% | Valor: +{p['value']}%\n"
+            if p.get("referee"):
+                msg += f"Árbitro: {p['referee']['name']} | AM/p: {p['referee']['avg_yellows']} | Rojas/p: {p['referee']['avg_reds']}\n"
+            msg += "\n"
     if new_s:
         msg += "ANALISIS ESTADISTICO\n"
         msg += "Busca estas lineas en tu casa de apuestas\n\n"
