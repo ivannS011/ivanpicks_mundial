@@ -430,8 +430,9 @@ def analyze_cc(home, away):
     if len(hk_list) >= MIN_SAMPLE and len(ak_list) >= MIN_SAMPLE:
         avg_k_home  = sum(hk_list) / len(hk_list)
         avg_k_away  = sum(ak_list) / len(ak_list)
-        combined_card_totals = h_card_totals + a_card_totals
-        res["cards_total"] = find_best_line(combined_card_totals, CARD_LINES, "tarjetas")
+        card_totals = h_card_totals if len(h_card_totals) >= MIN_SAMPLE else \
+                      [round(avg_k_home + avg_k_away)] * max(len(hk_list), len(ak_list))
+        res["cards_total"] = find_best_line(card_totals, CARD_LINES, "tarjetas")
         res["cards_home"]  = find_best_line(hk_list, [0.5, 1.5, 2.5], f"tarjetas ({home})")
         res["cards_away"]  = find_best_line(ak_list, [0.5, 1.5, 2.5], f"tarjetas ({away})")
         res["cards_avg"]   = round(avg_k_home + avg_k_away, 1)
@@ -444,8 +445,6 @@ def best_odds_pick(home, away, bookmakers, stats):
         return None
     candidates = []
     MAP = [
-        ("h2h",    home,        "home_form",   f"Gana {home}"),
-        ("h2h",    away,        "away_form",   f"Gana {away}"),
         ("totals", "Over 2.5",  "over25_prob", "Mas de 2.5 goles"),
         ("totals", "Under 2.5", "under25_prob","Menos de 2.5 goles"),
         ("totals", "Over 1.5",  "over15_prob", "Mas de 1.5 goles"),
@@ -538,12 +537,18 @@ def get_picks_by_window(hour_from, hour_to, turno_label):
             referee_name = None
             ref_stats = None
             if hid and aid:
-                fx_data = apif("fixtures", {"team": hid, "next": 1})
-                if fx_data:
-                    referee_raw = fx_data[0].get("fixture", {}).get("referee") or ""
-                    referee_name = referee_raw.split(",")[0].strip() if referee_raw else None
-                    ref_stats = get_referee_stats(referee_name)
-
+                today_str = datetime.now(TZ).strftime("%Y-%m-%d")
+                fx_data = apif("fixtures", {"team": hid, "date": today_str, "season": SEASON})
+                for fx in fx_data:
+                    teams = fx.get("teams", {})
+                    home_id = teams.get("home", {}).get("id")
+                    away_id = teams.get("away", {}).get("id")
+                    if set([home_id, away_id]) == set([hid, aid]):
+                        referee_raw = fx.get("fixture", {}).get("referee") or ""
+                        referee_name = referee_raw.split(",")[0].strip() if referee_raw else None
+                        ref_stats = get_referee_stats(referee_name)
+                        break
+                    
             stats = analyze_goals(home, away)
             pick  = best_odds_pick(home, away, bm, stats)
             if pick:
