@@ -285,17 +285,14 @@ def team_form(tid):
     fx = apif("fixtures", {"team": tid, "last": 8, "season": SEASON, "status": "FT"})
     if not fx:
         return None
-    wins, gf, ga, htf = 0, [], [], []
+    wins, gf, ga = 0, [], []
     for f in fx:
         hid     = f["teams"]["home"]["id"]
         hg      = f["goals"]["home"] or 0
         ag      = f["goals"]["away"] or 0
-        hht     = (f.get("score", {}).get("halftime", {}) or {}).get("home") or 0
-        aht     = (f.get("score", {}).get("halftime", {}) or {}).get("away") or 0
         is_home = hid == tid
         gf.append(hg if is_home else ag)
         ga.append(ag if is_home else hg)
-        htf.append(hht if is_home else aht)
         if f["teams"]["home" if is_home else "away"]["winner"]:
             wins += 1
     n = len(fx)
@@ -303,7 +300,6 @@ def team_form(tid):
         "win_rate":      round(wins / n * 100),
         "avg_for":       round(sum(gf) / n, 2),
         "avg_against":   round(sum(ga) / n, 2),
-        "avg_ht_for":    round(sum(htf) / n, 2),
         "goals_list":    gf,
         "conceded_list": ga,
         "sample":        n,
