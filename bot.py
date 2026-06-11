@@ -657,7 +657,7 @@ def revision_oportunidades():
         return
     now_hour = datetime.now(TZ).hour
     print(f"\n[REVISION {now_hour:02d}:00] Buscando oportunidades nuevas...")
-            o, s = get_picks_by_window(0, 24, f"Revision {now_hour:02d}:00")
+    o, s = get_picks_by_window(0, 24, f"Revision {now_hour:02d}:00")
     sent = load_sent()
     no   = [x for x in o if f"{x['match']}-{x['bet']}" not in sent]
     ns   = [x for x in s if f"{x['match']}-{x['bet']}" not in sent]
