@@ -675,7 +675,7 @@ if __name__ == "__main__":
         f"Analisis disponible desde el 11 de junio\n"
         f"Odds API: {load_odds_total()}/{MAX_ODDS_TOTAL} creditos usados"
     )
-    schedule.every().day.at("03:00").do(analisis_manana)
+    schedule.every().day.at("13:00").do(analisis_manana)
     schedule.every(2).hours.do(revision_oportunidades)
     print("Scheduler activo. Esperando...")
     while True:
