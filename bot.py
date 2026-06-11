@@ -644,17 +644,9 @@ def analisis_manana():
     if not mundial_iniciado():
         print("[05:00] Mundial no iniciado, esperando al 11 de junio...")
         return
-    print("\n[05:00] Analisis turno manana...")
-    o, s = get_picks_by_window(6, 14, "Turno Manana")
-    send_picks(o, s, "Turno Manana")
-
-def analisis_tarde():
-    if not mundial_iniciado():
-        print("[13:00] Mundial no iniciado, esperando al 11 de junio...")
-        return
-    print("\n[13:00] Analisis turno tarde/noche...")
-    o, s = get_picks_by_window(14, 24, "Turno Tarde/Noche")
-    send_picks(o, s, "Turno Tarde/Noche")
+    print("\n[03:00] Analisis diario...")
+    o, s = get_picks_by_window(0, 24, "Picks del dia")
+    send_picks(o, s, "Picks del dia")
 
 def revision_oportunidades():
     if not mundial_iniciado():
@@ -665,10 +657,7 @@ def revision_oportunidades():
         return
     now_hour = datetime.now(TZ).hour
     print(f"\n[REVISION {now_hour:02d}:00] Buscando oportunidades nuevas...")
-    if 5 <= now_hour < 13:
-        o, s = get_picks_by_window(6, 14, f"Revision {now_hour:02d}:00")
-    else:
-        o, s = get_picks_by_window(14, 24, f"Revision {now_hour:02d}:00")
+            o, s = get_picks_by_window(0, 24, f"Revision {now_hour:02d}:00")
     sent = load_sent()
     no   = [x for x in o if f"{x['match']}-{x['bet']}" not in sent]
     ns   = [x for x in s if f"{x['match']}-{x['bet']}" not in sent]
@@ -686,8 +675,7 @@ if __name__ == "__main__":
         f"Analisis disponible desde el 11 de junio\n"
         f"Odds API: {load_odds_total()}/{MAX_ODDS_TOTAL} creditos usados"
     )
-    schedule.every().day.at("05:00").do(analisis_manana)
-    schedule.every().day.at("13:00").do(analisis_tarde)
+    schedule.every().day.at("03:00").do(analisis_manana)
     schedule.every(2).hours.do(revision_oportunidades)
     print("Scheduler activo. Esperando...")
     while True:
